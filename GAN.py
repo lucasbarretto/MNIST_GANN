@@ -58,9 +58,9 @@ class Generator(nn.Module):
 # function to print sample images
 def printImages(images):
     fig = plt.figure(1)
-    
+    plt.title('Sample Generated Images - Learning Evolution')
     for i in range(len(images)):
-        ax = fig.add_subplot(4,5,i+1)
+        ax = fig.add_subplot(4,len(images),i+1)
         ax.set_axis_off()
         ax = plt.imshow(images[i].view(28,28).detach().numpy(), cmap='Greys_r')
 
@@ -68,7 +68,7 @@ def printImages(images):
 
 # discriminator hyperparameters
 d_i = 28*28 # discriminator input size
-d_n = 32 # discriminator hidden layer size
+d_n = 21 # discriminator hidden layer size
 d_o = 1 # discriminator output size
 
 # generator hyperparameters
@@ -87,7 +87,7 @@ def getRandomNoise(z_i):
     return torch.rand(1, z_i)
 
 # training hyperparameters
-maxEpochs = 100
+maxEpochs = 500
 d_learningRate = 0.001
 g_learningRate = 0.001
 
@@ -149,7 +149,9 @@ for epoch in range(maxEpochs):
 printImages(sampleGenImages)
 
 # print loss charts
-plt.plot(d_loss_data)
-plt.plot(g_loss_data)
+plt.plot(d_loss_data, label='Discriminator Loss')
+plt.plot(g_loss_data, label='Generator Loss')
+plt.title('Training Losses')
+plt.legend()
 plt.show()
 
