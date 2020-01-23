@@ -12,6 +12,7 @@ trainset = torchvision.datasets.MNIST(root='./data', train=True,
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=64,
                                           shuffle=True, num_workers=0)
 
+# define discriminator class
 class Discriminator(nn.Module):
     def __init__(self,i,n,o):
         super(Discriminator, self).__init__()
@@ -33,6 +34,7 @@ class Discriminator(nn.Module):
 
         return x
 
+# define generator class
 class Generator(nn.Module):
     def __init__(self,i,n,o):
         super(Generator, self).__init__()
@@ -53,6 +55,16 @@ class Generator(nn.Module):
 
         return x
 
+# function to print sample images
+def printImages(images):
+    fig = plt.figure(1)
+    
+    for i in range(len(images)):
+        ax = fig.add_subplot(4,5,i+1)
+        ax.set_axis_off()
+        ax = plt.imshow(images[i].view(28,28).detach().numpy(), cmap='Greys_r')
+
+    plt.show()
 
 # discriminator hyperparameters
 d_i = 28*28 # discriminator input size
@@ -85,6 +97,7 @@ g_optimizer = optim.SGD(G.parameters(), lr=g_learningRate, momentum=0.8)
 
 d_loss_data = []
 g_loss_data = []
+sampleGenImages = []
 
 for epoch in range(maxEpochs):
 
@@ -101,7 +114,7 @@ for epoch in range(maxEpochs):
 
         # train D on fake samples (FS = Fake Samples)
         z = getRandomNoise(z_i)
-        fakeImages = G(z)  
+        fakeImages = G(z)
         d_prediction_FS = D(fakeImages)
         d_labels_FS = torch.zeros([1,1]) # samples belong to the real data distribution
         d_loss_FS = criterion(d_prediction_FS, d_labels_FS)
@@ -121,12 +134,21 @@ for epoch in range(maxEpochs):
         g_loss.backward()
         g_optimizer.step()
 
+    # print losses
     if epoch % 1 == 0:
         print('Epoch: %s - D: (%s) | G: (%s)' % (epoch, d_loss.item(), g_loss.item()))
-    
+
+    if epoch % 5 == 0:
+        sampleGenImages.append(fakeImages)
+        
+    # store losses
     d_loss_data.append(d_loss.item())
     g_loss_data.append(g_loss.item())
 
+# print samples of generated images through training
+printImages(sampleGenImages)
+
+# print loss charts
 plt.plot(d_loss_data)
 plt.plot(g_loss_data)
 plt.show()
