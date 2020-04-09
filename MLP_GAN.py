@@ -5,6 +5,9 @@ import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import numpy as np
+
+device = torch.device("cuda:0")
 
 transform = transforms.ToTensor()
 trainset = torchvision.datasets.MNIST(root='./data', train=True,
@@ -56,8 +59,8 @@ class Generator(nn.Module):
         return x
 
 # function to print sample images
-def printImages(images):
-    fig = plt.figure(1)
+def printSamples(G):
+            
     plt.title('Sample Generated Images - Learning Evolution')
     for i in range(len(images)):
         ax = fig.add_subplot(4,len(images),i+1)
@@ -65,6 +68,10 @@ def printImages(images):
         ax = plt.imshow(images[i].view(28,28).detach().numpy(), cmap='Greys_r')
 
     plt.show()
+
+# generate random noise distribution
+def getRandomNoise(z_i, batch_size):
+    return torch.rand(batch_size, z_i).to(device)
 
 # discriminator hyperparameters
 d_i = 28*28 # discriminator input size
@@ -77,17 +84,13 @@ g_n = 32 # generator hidden layer size
 g_o = 28*28 # generator output size
 
 # initiate the discriminator network
-D = Discriminator(d_i, d_n, d_o)
+D = Discriminator(d_i, d_n, d_o).to(device)
 
 # initiate the generator network
-G = Generator(z_i, g_n, g_o)
-
-# generate random noise distribution
-def getRandomNoise(z_i):
-    return torch.rand(1, z_i)
+G = Generator(z_i, g_n, g_o).to(device)
 
 # training hyperparameters
-maxEpochs = 500
+maxEpochs = 100
 d_learningRate = 0.001
 g_learningRate = 0.001
 
@@ -102,21 +105,22 @@ sampleGenImages = []
 for epoch in range(maxEpochs):
 
     for i,data in enumerate(trainloader,0):                
-        realImages, realLabels = data
+        realImages, realLabels = data[0].to(device), data[1].to(device)
         batchSize = realLabels.size(0)
+        
         d_optimizer.zero_grad()
         
         # train D on real samples (RS = Real Samples)
         d_prediction_RS = D(realImages)
-        d_labels_RS = torch.ones([batchSize,1]) # samples belong to the real data distribution
+        d_labels_RS = torch.ones([batchSize,1]).to(device) # samples belong to the real data distribution
         d_loss_RS = criterion(d_prediction_RS, d_labels_RS)
         d_loss_RS.backward() # compute gradients without changing D's parameters
 
         # train D on fake samples (FS = Fake Samples)
-        z = getRandomNoise(z_i)
+        z = getRandomNoise(z_i, batchSize)
         fakeImages = G(z)
         d_prediction_FS = D(fakeImages)
-        d_labels_FS = torch.zeros([1,1]) # samples belong to the real data distribution
+        d_labels_FS = torch.zeros([batchSize,1]).to(device) # samples belong to the real data distribution
         d_loss_FS = criterion(d_prediction_FS, d_labels_FS)
         d_loss_FS.backward() # compute gradients without changing D's parameters
 
@@ -126,10 +130,10 @@ for epoch in range(maxEpochs):
 
         # train G
         g_optimizer.zero_grad()
-        z = getRandomNoise(z_i)
+        z = getRandomNoise(z_i, batchSize)
         fakeImages = G(z)
         d_loss_g = D(fakeImages)
-        g_loss = criterion(d_loss_g, torch.ones([1,1]))
+        g_loss = criterion(d_loss_g, torch.ones([batchSize,1]).to(device))
 
         g_loss.backward()
         g_optimizer.step()
@@ -139,7 +143,7 @@ for epoch in range(maxEpochs):
         print('Epoch: %s - D: (%s) | G: (%s)' % (epoch, d_loss.item(), g_loss.item()))
 
     if epoch % 5 == 0:
-        sampleGenImages.append(fakeImages)
+        sampleGenImages.append(fakeImages.cpu())
         
     # store losses
     d_loss_data.append(d_loss.item())
