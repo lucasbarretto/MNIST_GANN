@@ -15,6 +15,8 @@ trainset = torchvision.datasets.MNIST(root='./data', train=True,
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=64,
                                           shuffle=True, num_workers=0)
 
+print('loaded modules and dataset')
+
 # define discriminator class
 class Discriminator(nn.Module):
     def __init__(self,i,n,o):
@@ -27,14 +29,13 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         x = x.view(-1,28*28)
-        x = F.leaky_relu(self.l1(x), 0.2) # (input, negative_slope=0.2)
+        x = F.leaky_relu(self.l1(x), 0.2)
         x = self.dropout(x)
         x = F.leaky_relu(self.l2(x), 0.2)
         x = self.dropout(x)
         x = F.leaky_relu(self.l3(x), 0.2)
         x = self.dropout(x)
         x = torch.sigmoid(self.l4(x))
-
         return x
 
 # define generator class
@@ -55,24 +56,52 @@ class Generator(nn.Module):
         x = F.leaky_relu(self.l3(x), 0.2)
         x = self.dropout(x)
         x = torch.tanh(self.l4(x))
-
         return x
 
-# function to print sample images
-def printSamples(G):
-            
-    plt.title('Sample Generated Images - Learning Evolution')
-    for i in range(len(images)):
-        ax = fig.add_subplot(4,len(images),i+1)
-        ax.set_axis_off()
-        ax = plt.imshow(images[i].view(28,28).detach().numpy(), cmap='Greys_r')
+# generate points from latent space distribution
+def generateLatentPoints(z_i, batch_size):
+    return torch.randn(batch_size, z_i, device=device)
 
+def interpolateLatentPoints(G, p1, p2, numSamples=10, mode='linear'):
+    ratios = np.linspace(0, 1, numSamples)
+    
+    if mode == 'linear':
+        z = []
+        for ratio in ratios:
+            v = (1.0 - ratio) * p1 + ratio * p2
+            z.append(v.tolist())
+
+    elif mode == 'spherical':
+        return 0
+    
+    z = torch.tensor(z).to(device)
+    G.eval()
+    with torch.no_grad():
+        fakeImages = G(z)
+    return fakeImages
+
+# function to print sample images
+def printImages(images):
+    
+    for i in range(len(images)):
+        ax = plt.subplot(1,len(images),i+1)
+        ax.set_axis_off()
+        ax = plt.imshow(images[i].view(28,28).cpu().numpy(), cmap='gray')
     plt.show()
 
-# generate random noise distribution
-def getRandomNoise(z_i, batch_size):
-    return torch.rand(batch_size, z_i).to(device)
-
+# function to generate smooth labels
+def generateSmoothLabels(arg, batch_size):
+    
+    # true labels are in range [0.8, 1.2]
+    if arg == 'True':
+        labels = 1.2-0.4*torch.rand(batch_size, 1, device=device)
+    
+    # false labels are in range [0.0, 0.3]
+    if arg == 'False':
+        labels = 0.2*torch.rand(batch_size, 1, device=device)
+    
+    return labels
+    
 # discriminator hyperparameters
 d_i = 28*28 # discriminator input size
 d_n = 21 # discriminator hidden layer size
@@ -91,17 +120,15 @@ G = Generator(z_i, g_n, g_o).to(device)
 
 # training hyperparameters
 maxEpochs = 100
-d_learningRate = 0.001
-g_learningRate = 0.001
 
 criterion = nn.BCELoss()  # Binary cross entropy
-d_optimizer = optim.SGD(D.parameters(), lr=d_learningRate, momentum=0.8)
-g_optimizer = optim.SGD(G.parameters(), lr=g_learningRate, momentum=0.8)
+d_optimizer = optim.Adam(D.parameters())
+g_optimizer = optim.Adam(G.parameters())
 
 d_loss_data = []
 g_loss_data = []
-sampleGenImages = []
 
+print('started training')
 for epoch in range(maxEpochs):
 
     for i,data in enumerate(trainloader,0):                
@@ -112,25 +139,24 @@ for epoch in range(maxEpochs):
         
         # train D on real samples (RS = Real Samples)
         d_prediction_RS = D(realImages)
-        d_labels_RS = torch.ones([batchSize,1]).to(device) # samples belong to the real data distribution
-        d_loss_RS = criterion(d_prediction_RS, d_labels_RS)
+        d_labels_RS = generateSmoothLabels('True', batchSize) # samples belong to the real data
+        d_loss_RS = criterion(d_prediction_RS, d_labels_RS) # D loss for real samples
         d_loss_RS.backward() # compute gradients without changing D's parameters
 
         # train D on fake samples (FS = Fake Samples)
-        z = getRandomNoise(z_i, batchSize)
+        z = generateLatentPoints(z_i, batchSize)
         fakeImages = G(z)
         d_prediction_FS = D(fakeImages)
-        d_labels_FS = torch.zeros([batchSize,1]).to(device) # samples belong to the real data distribution
-        d_loss_FS = criterion(d_prediction_FS, d_labels_FS)
+        d_labels_FS = generateSmoothLabels('False', batchSize) # samples belong to the generated data
+        d_loss_FS = criterion(d_prediction_FS, d_labels_FS) # D loss for fake samples
         d_loss_FS.backward() # compute gradients without changing D's parameters
-
+       
         d_loss = d_loss_RS + d_loss_FS
-        #d_loss.backward()
         d_optimizer.step()
 
         # train G
         g_optimizer.zero_grad()
-        z = getRandomNoise(z_i, batchSize)
+        z = generateLatentPoints(z_i, batchSize)
         fakeImages = G(z)
         d_loss_g = D(fakeImages)
         g_loss = criterion(d_loss_g, torch.ones([batchSize,1]).to(device))
@@ -143,7 +169,10 @@ for epoch in range(maxEpochs):
         print('Epoch: %s - D: (%s) | G: (%s)' % (epoch, d_loss.item(), g_loss.item()))
 
     if epoch % 5 == 0:
-        sampleGenImages.append(fakeImages.cpu())
+        [p1,p2] = generateLatentPoints(z_i, 2)
+        sampleImages = interpolateLatentPoints(G, p1, p2)
+        printImages(sampleImages)
+        
         
     # store losses
     d_loss_data.append(d_loss.item())
