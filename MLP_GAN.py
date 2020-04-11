@@ -122,8 +122,8 @@ G = Generator(z_i, g_n, g_o).to(device)
 maxEpochs = 100
 
 criterion = nn.BCELoss()  # Binary cross entropy
-d_optimizer = optim.Adam(D.parameters())
-g_optimizer = optim.Adam(G.parameters())
+d_optimizer = optim.SGD(D.parameters(), lr = 0.001, momentum=0.8)
+g_optimizer = optim.SGD(G.parameters(), lr = 0.001, momentum=0.8)
 
 d_loss_data = []
 g_loss_data = []
@@ -169,18 +169,22 @@ for epoch in range(maxEpochs):
         print('Epoch: %s - D: (%s) | G: (%s)' % (epoch, d_loss.item(), g_loss.item()))
 
     if epoch % 5 == 0:
-        [p1,p2] = generateLatentPoints(z_i, 2)
-        sampleImages = interpolateLatentPoints(G, p1, p2)
+        # print samples of generated images through training
+        z_samples = generateLatentPoints(z_i, 10)
+        with torch.no_grad():
+            sampleImages = G(z_samples)
         printImages(sampleImages)
-        
-        
+
     # store losses
     d_loss_data.append(d_loss.item())
     g_loss_data.append(g_loss.item())
 
-# print samples of generated images through training
-printImages(sampleGenImages)
-
+# print linear interpolated samples
+for i in range(6):
+    [p1,p2] = generateLatentPoints(z_i, 2)
+    sampleImages = interpolateLatentPoints(G, p1, p2)
+    printImages(sampleImages)
+    
 # print loss charts
 plt.plot(d_loss_data, label='Discriminator Loss')
 plt.plot(g_loss_data, label='Generator Loss')
