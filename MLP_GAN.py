@@ -79,7 +79,7 @@ def interpolateLatentPoints(G, p1, p2, numSamples=10, mode='linear'):
 
 # function to print sample images
 def printImages(images):
-    num_rows = len(images)/10
+    num_rows = len(images)//10 + 1
     for i in range(len(images)):
         ax = plt.subplot(num_rows,len(images),i+1)
         ax.set_axis_off()
@@ -197,8 +197,9 @@ def train(G, D, trainloader, max_epochs):
         # store losses
         d_loss_data.append(d_loss.item())
         g_loss_data.append(g_loss.item())
-
-    return G, D, g_loss_data, d_loss_data
+    
+    print('finished training')
+    return G, D, g_loss_data, d_loss_data, generatedImages
 
 # discriminator hyperparameters
 d_i = 28*28 # discriminator input size
@@ -217,11 +218,11 @@ D = Discriminator(d_i, d_n, d_o).to(device)
 G = Generator(z_i, g_n, g_o).to(device)
 
 # training hyperparameters
-maxEpochs = 5
+maxEpochs = 30
 
-G, D, g_loss, d_loss = train(G, D, trainloader, maxEpochs)
+G, D, g_loss, d_loss, generatedImages = train(G, D, trainloader, maxEpochs)
 
-printImages(generatedImages)
+# printImages(generatedImages)
 printLosses(g_loss, d_loss)
 
 # print interpolated samples
