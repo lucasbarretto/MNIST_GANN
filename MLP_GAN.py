@@ -79,13 +79,27 @@ def interpolateLatentPoints(G, p1, p2, numSamples=10, mode='linear'):
 
 # function to print sample images
 def printImages(images):
-    num_rows = len(images)//10 + 1
     for i in range(len(images)):
-        ax = plt.subplot(num_rows,len(images),i+1)
+        ax = plt.subplot(1,len(images),i+1)
         ax.set_axis_off()
         ax = plt.imshow(images[i].view(28,28).cpu().numpy(), cmap='gray')
     plt.show()
 
+# function to print multiple image lines
+def printImageMatrix(imageData, title):
+    numRows = len(imageData)
+    
+    n=0
+    fig = plt.figure(1)
+    fig.suptitle(title)
+    for line in imageData:
+        for i in range(len(line)):
+            ax = fig.add_subplot(numRows,len(line),n+1)
+            ax.set_axis_off()
+            ax = plt.imshow(line[i].view(28,28).cpu().numpy(), cmap='gray')
+            n+=1 
+    plt.show()
+        
 # function to evaluate model
 def evaluateModel(G, mode='random', interpolation_mode='linear'):
     if mode == 'random':
@@ -126,20 +140,18 @@ def generateLabels(arg, batch_size, smooth='False'):
 
 def printLosses(g_loss, d_loss):
     # print loss charts
-    plt.plot(d_loss, label='Discriminator Loss')
-    plt.plot(g_loss, label='Generator Loss')
+    plt.plot(d_loss, label='Discriminator Loss', marker = 'o', c='blue')
+    plt.plot(g_loss, label='Generator Loss', marker = 'o', c='orange')
     plt.title('Training Losses')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
     plt.legend()
     plt.show()
     
-def train(G, D, trainloader, max_epochs):
+def train(G, D, g_optimizer, d_optimizer, trainloader, max_epochs):
     print('started training')
     
     criterion = nn.BCELoss()  # binary cross entropy loss
-    
-    # define optimizers
-    d_optimizer = optim.SGD(D.parameters(), lr = 0.001, momentum=0.8)
-    g_optimizer = optim.SGD(G.parameters(), lr = 0.001, momentum=0.8)
 
     # initialize data structures
     d_loss_data = []
@@ -151,7 +163,6 @@ def train(G, D, trainloader, max_epochs):
         for i,data in enumerate(trainloader,0):                
             realImages, realLabels = data[0].to(device), data[1].to(device)
             batchSize = realLabels.size(0)
-            
             d_optimizer.zero_grad()
             
             # train D on real samples (RS = Real Samples)
@@ -183,10 +194,11 @@ def train(G, D, trainloader, max_epochs):
             g_optimizer.step()
 
         # print losses
-        if epoch % 5 == 0:
+        if epoch % 5 == 0 and epoch != 0:
             printLosses(g_loss_data, d_loss_data)
 
         if epoch % 1 == 0:
+            # print losses for generator and discriminator
             print('Epoch: %s - D: (%s) | G: (%s)' % (epoch, d_loss.item(), g_loss.item()))
             
             # print samples of generated images through training
@@ -217,16 +229,22 @@ D = Discriminator(d_i, d_n, d_o).to(device)
 # initiate the generator network
 G = Generator(z_i, g_n, g_o).to(device)
 
+# define optimizers
+d_optimizer = optim.SGD(D.parameters(), lr = 0.001, momentum=0.8)
+g_optimizer = optim.SGD(G.parameters(), lr = 0.001, momentum=0.8)
+
 # training hyperparameters
-maxEpochs = 30
+maxEpochs = 5
 
-G, D, g_loss, d_loss, generatedImages = train(G, D, trainloader, maxEpochs)
+G, D, g_loss, d_loss, generatedImages = train(G, D, g_optimizer, d_optimizer,
+                                              trainloader, maxEpochs)
 
-# printImages(generatedImages)
 printLosses(g_loss, d_loss)
+printImageMatrix(generatedImages, 'Learning Evolution - Random Samples')
 
 # print interpolated samples
+interpolatedSamples = []
 for _ in range(4):
-    sampleImages = evaluateModel(G, interpolation_mode='interpolate')
-    printImages(sampleImages)
+    interpolatedSamples.append(evaluateModel(G, interpolation_mode='interpolate'))
+printImageMatrix(interpolatedSamples, 'interpolated samples')
 
