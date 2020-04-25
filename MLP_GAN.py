@@ -77,11 +77,11 @@ D = Discriminator(d_i, d_n, d_o).to(device)
 G = Generator(z_i, g_n, g_o).to(device)
 
 # define optimizers
-d_optimizer = optim.SGD(D.parameters(), lr = 0.001, momentum=0.8)
-g_optimizer = optim.SGD(G.parameters(), lr = 0.001, momentum=0.8)
+d_optimizer = optim.Adam(D.parameters(), lr = 0.0002, betas=(0.5, 0.999))
+g_optimizer = optim.Adam(G.parameters(), lr = 0.0002, betas=(0.5,0.999))
 
 # training hyperparameters
-maxEpochs = 5
+maxEpochs = 10
 
 G, D, g_loss, d_loss, generatedImages = gan.train(G, D, g_optimizer, d_optimizer,
                                               z_i, trainloader, maxEpochs)
