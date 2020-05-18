@@ -78,20 +78,22 @@ G = Generator(z_i, g_n, g_o).to(device)
 
 # define optimizers
 d_optimizer = optim.Adam(D.parameters(), lr = 0.0002, betas=(0.5, 0.999))
-g_optimizer = optim.Adam(G.parameters(), lr = 0.0002, betas=(0.5,0.999))
+g_optimizer = optim.Adam(G.parameters(), lr = 0.0002, betas=(0.5, 0.999))
 
 # training hyperparameters
 maxEpochs = 10
+net_type = 'MLP'
 
-G, D, g_loss, d_loss, generatedImages = gan.train(G, D, g_optimizer, d_optimizer,
-                                              z_i, trainloader, maxEpochs)
+D, G, d_loss, g_loss, generatedImages = gan.train(net_type, trainloader, D, G,
+                                                  d_optimizer, g_optimizer,
+                                                  z_i, maxEpochs)
 
-gan.printLosses(g_loss, d_loss)
+gan.printLosses(d_loss, g_loss)
 gan.printImageMatrix(generatedImages, 'Learning Evolution - Random Samples')
 
 # print interpolated samples
 interpolatedSamples = []
 for _ in range(4):
-    interpolatedSamples.append(gan.evaluateModel(G, z_i, interpolation_mode='interpolate'))
+    interpolatedSamples.append(gan.evaluateModel(G, z_i, net_type, interpolation_mode='interpolate'))
 gan.printImageMatrix(interpolatedSamples, 'interpolated samples')
 
